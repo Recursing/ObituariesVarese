@@ -1,137 +1,141 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>Weekly obituaries on Varese News</title>
-    <meta charset="utf-8" />
 
-    <script src="https://cdn.jsdelivr.net/npm/vega@5.12.1"></script>
-    <script src="https://cdn.jsdelivr.net/npm/vega-lite@4.13.1"></script>
-    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6.8.0"></script>
+<head>
+  <title>Weekly obituaries on Varese News</title>
+  <meta charset="utf-8" />
 
-    <style>
-      body {
-        font-family: "Arial";
-        text-align: center;
-      }
-      .vega-actions a {
-        margin-right: 5px;
-      }
-      #vis,
-      #vis2 {
-        width: 80%;
-        height: min(60vh, 40vw);
-      }
-    </style>
-  </head>
-  <body>
-    <h1>Weekly obituaries on Varese News (live)</h1>
-    <!-- Container for the visualization -->
-    <div id="vis"></div>
-    <p>
-      Data scraped from
-      <a href="https://necrologie.varesenews.it/">VareseNews</a>
-    </p>
-    <h2>Istat data (published months later)</h2>
-    <div id="vis2"></div>
+  <script src="https://cdn.jsdelivr.net/npm/vega@5.12.1"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vega-lite@4.13.1"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vega-embed@6.8.0"></script>
 
-    <script>
-      var colors = ["#38C425", "#AF853A", "#F4B400", "#2A0785", "red"];
-      function getVlSpec(source) {
-        return {
-          $schema: "https://vega.github.io/schema/vega-lite/v4.json",
-          width: "container",
-          height: "container",
-          data: { url: source },
-          transform: [
-            { filter: 'datum.year > "2015"' },
-            {
-              frame: [-6, 0],
-              window: [
-                {
-                  field: "obituaries",
-                  op: "sum",
-                  as: "somma settimanale",
-                },
-              ],
-              groupby: ["year"],
-            },
-          ],
-          config: {
-            invalidValues: "filter",
+  <style>
+    body {
+      font-family: "Arial";
+      text-align: center;
+    }
+
+    .vega-actions a {
+      margin-right: 5px;
+    }
+
+    #vis,
+    #vis2 {
+      width: 80%;
+      height: min(60vh, 40vw);
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Weekly obituaries on Varese News (live)</h1>
+  <!-- Container for the visualization -->
+  <div id="vis"></div>
+  <p>
+    Data scraped from
+    <a href="https://necrologie.varesenews.it/">VareseNews</a>
+  </p>
+  <h2>Istat data (published months later)</h2>
+  <div id="vis2"></div>
+
+  <script>
+    var colors = ["#38C425", "#AF853A", "#F4B400", "#2A0785", "red"];
+    function getVlSpec(source) {
+      return {
+        $schema: "https://vega.github.io/schema/vega-lite/v4.json",
+        width: "container",
+        height: "container",
+        data: { url: source },
+        transform: [
+          { filter: 'datum.year > "2015"' },
+          {
+            frame: [-6, 0],
+            window: [
+              {
+                field: "obituaries",
+                op: "sum",
+                as: "somma settimanale",
+              },
+            ],
+            groupby: ["year"],
           },
-          layer: [
-            {
-              mark: { type: "point", size: 15, filled: true },
-              encoding: {
-                y: {
-                  field: "obituaries",
-                  type: "quantitative",
-                  title:
-                    (source.includes("decessi") ? "Deaths" : "Obituaries") +
-                    ", Weekly total",
+        ],
+        config: {
+          invalidValues: "filter",
+        },
+        layer: [
+          {
+            mark: { type: "point", size: 15, filled: true },
+            encoding: {
+              y: {
+                field: "obituaries",
+                type: "quantitative",
+                title:
+                  (source.includes("decessi") ? "Deaths" : "Obituaries") +
+                  ", Weekly total",
+              },
+              x: {
+                field: "day",
+                type: "nominal",
+                axis: {
+                  labelOverlap: true,
+                  labelFontSize: 14,
                 },
-                x: {
-                  field: "day",
-                  type: "nominal",
-                  axis: {
-                    labelOverlap: true,
-                    labelFontSize: 14,
-                  },
+              },
+              color: {
+                field: "year",
+                type: "nominal",
+                scale: { range: colors },
+              },
+              opacity: {
+                condition: {
+                  test: "datum['year'] == 2020",
+                  value: 0.6,
                 },
-                color: {
-                  field: "year",
-                  type: "nominal",
-                  scale: { range: colors },
-                },
-                opacity: {
-                  condition: {
-                    test: "datum['year'] == 2020",
-                    value: 0.6,
-                  },
-                  value: 0.4,
-                },
+                value: 0.4,
               },
             },
-            {
-              transform: [
-                { filter: 'datum.day > "01-07"' }, // Filter Transform
-              ],
-              mark: {
-                size: 5,
-                type: "line",
-                strokeCap: "round",
-                strokeJoin: "round",
+          },
+          {
+            transform: [
+              { filter: 'datum.day > "01-07"' }, // Filter Transform
+            ],
+            mark: {
+              size: 5,
+              type: "line",
+              strokeCap: "round",
+              strokeJoin: "round",
+            },
+            encoding: {
+              x: {
+                field: "day",
+                type: "nominal",
               },
-              encoding: {
-                x: {
-                  field: "day",
-                  type: "nominal",
-                },
-                y: {
-                  field: "somma settimanale",
-                  type: "quantitative",
-                },
+              y: {
+                field: "somma settimanale",
+                type: "quantitative",
+              },
 
-                color: {
-                  field: "year",
-                  type: "nominal",
-                  scale: { range: colors },
+              color: {
+                field: "year",
+                type: "nominal",
+                scale: { range: colors },
+              },
+              opacity: {
+                condition: {
+                  test: "datum['year'] == 2020",
+                  value: 1.0,
                 },
-                opacity: {
-                  condition: {
-                    test: "datum['year'] == 2020",
-                    value: 1.0,
-                  },
-                  value: 0.5,
-                },
+                value: 0.5,
               },
             },
-          ],
-        };
-      }
-      vegaEmbed("#vis", getVlSpec("data.csv"));
-      vegaEmbed("#vis2", getVlSpec("decessi_varese.csv"));
-    </script>
-  </body>
+          },
+        ],
+      };
+    }
+    vegaEmbed("#vis", getVlSpec("data.csv"));
+    vegaEmbed("#vis2", getVlSpec("decessi_varese.csv"));
+  </script>
+</body>
+
 </html>
-
