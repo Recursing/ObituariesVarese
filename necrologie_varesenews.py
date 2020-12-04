@@ -1,13 +1,15 @@
 import csv
+import json
+from datetime import date
 import datetime
 import urllib.request
-from collections import Counter
-from multiprocessing.pool import Pool
-from typing import Tuple, List
+from collections import defaultdict
+from typing import List
 
 from bs4 import BeautifulSoup
 
-data_file = "/var/www/html/necrologi-varese/data.csv"
+data_file = "data.csv"
+daily_urls_file = "already_counted.json"
 
 opener = urllib.request.build_opener()
 opener.addheaders = [("User-agent", "Mozilla/5.0")]
@@ -19,84 +21,65 @@ def http_get(url: str) -> bytes:
 
 
 def get_page(d: int) -> bytes:
-    return http_get(f"http://necrologie.varesenews.it/?page={d}")
+    return http_get(f"https://www.varesenews.it/necrologie/defunti/page/{d}/")
 
 
 def get_urls(page: bytes) -> List[str]:
     soup = BeautifulSoup(page, "lxml")
     return [
-        e("a")[0]["href"]
-        for e in soup("li")
-        if e("a")
-        and e("a")[0]["href"].startswith(
-            "http://necrologie.varesenews.it/annuncio-famiglia/"
+        e["href"]
+        for e in soup("a")
+        if e["href"].startswith(
+            "https://www.varesenews.it/necrologie/annuncio-famiglia/"
         )
     ]
 
 
-def get_date(page: bytes) -> str:
-    soup = BeautifulSoup(page, "lxml")
-    date = soup(class_="city-date")[0].text.strip().split("\t")[-1]
-    return date
-
-
-def formatted_date(date_str: str) -> str:
-    day, month, year = date_str.split()
-    months = [
-        "gennaio",
-        "febbraio",
-        "marzo",
-        "aprile",
-        "maggio",
-        "giugno",
-        "luglio",
-        "agosto",
-        "settembre",
-        "ottobre",
-        "novembre",
-        "dicembre",
-    ]
-    month_num = months.index(month) + 1
-    date = datetime.date(int(year), month_num, int(day))
-    return date.strftime("%Y-%m-%d")
-
-
 def main():
+    with open(data_file, "r") as csv_data:
+        data = list(csv.DictReader(csv_data))
     try:
-        with open(data_file, "r") as csv_data:
-            data = list(csv.DictReader(csv_data))
-            cached_days = [d["day"] for d in data if d["year"] == "2020"]
-            last_complete_day = f"2020-{sorted(cached_days)[-5]}"
+        with open(daily_urls_file, "r") as json_file:
+            daily_urls = json.load(json_file)
+            last_complete_day = max(daily_urls.values(), default=None)
     except (FileNotFoundError, IndexError, UnicodeDecodeError) as e:
-        print(f"{e!r}")
-        data = []
-        last_complete_day = "2016-01-01"
+        daily_urls = {}
+        last_complete_day = None
 
     print(f"{last_complete_day=}")
 
-    with Pool(20) as pool:
-        saved_urls = set()
-        deaths_per_day = Counter()
-        for page_num in range(1, 665):
-            print(f"Parsing page {page_num}")
-            page = get_page(page_num)
-            new_urls = {url for url in get_urls(page) if url not in saved_urls}
-            saved_urls |= new_urls
-            obituaries = pool.map(http_get, new_urls)
-            dates = pool.map(get_date, obituaries)
-            dates = [formatted_date(date) for date in dates]
-            deaths_per_day += Counter(dates)
-            print(deaths_per_day)
-            if max(dates) < last_complete_day:
-                break
-            print(f"{max(dates)} > {last_complete_day}")
+    today = str(date.today())
+    new_deaths = 0
+    for page_num in range(1, 10):
+        print(f"Parsing page {page_num}")
+        page = get_page(page_num)
+        new_urls = {url: today for url in get_urls(page) if url not in daily_urls}
+        if not new_urls:
+            break
+        new_deaths += len(new_urls)
+        daily_urls.update(new_urls)
+    with open(daily_urls_file, "w") as of:
+        json.dump(daily_urls, of)
+    deaths_per_day = defaultdict(float)
+    if last_complete_day == today and new_deaths:
+        deaths_per_day[today] += new_deaths
+    elif last_complete_day is not None and new_deaths:
+        d1 = date.fromisoformat(last_complete_day)
+        d2 = date.today()
+        delta = (d2 - d1).days
+        print(f"DAYS DELTA: {delta}")
+        for d in range(1, delta + 1):
+            day = d1 + datetime.timedelta(d)
+            deaths_per_day[str(day)] = new_deaths / delta
 
     for d in data:
         year = d["year"]
         day = d["day"]
-        obituaries = int(d["obituaries"])
+        obituaries = float(d["obituaries"])
+        if obituaries == int(obituaries):
+            obituaries = int(obituaries)
         date_str = f"{year}-{day}"
-        deaths_per_day[date_str] = max(deaths_per_day[date_str], obituaries)
+        deaths_per_day[date_str] = max(deaths_per_day.get(date_str, 0), obituaries)
 
     new_data = []
     for date_str, obituaries in deaths_per_day.items():
