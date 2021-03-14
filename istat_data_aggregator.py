@@ -3,7 +3,7 @@ import pandas as pd
 # https://www.istat.it/it/archivio/240401
 # "Dataset con i decessi giornalieri" : https://www.istat.it/it/files//2020/03/Dataset-decessi-comunali-giornalieri-e-tracciato-record_22ottobre2020.zip 
 
-df = pd.read_csv("comuni_giornaliero_dati_fino_31agosto.csv", encoding="cp1252")
+df = pd.read_csv("comuni_giornaliero_31dicembre.csv", encoding="cp1252")
 
 # Keep only Varese province
 df = df[df.NOME_PROVINCIA == "Varese"]
